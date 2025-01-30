@@ -52,7 +52,7 @@ void notify(String text) {
   lcd.print("                   ");
   delay(1500);
   lcd.setCursor(0, 2);
-  lcd.print(text)
+  lcd.print(text);
 }
 
 // Send an error message to LCD
