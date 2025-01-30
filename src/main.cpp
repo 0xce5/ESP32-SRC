@@ -30,11 +30,13 @@ MFRC522 rfid(SS_PIN, RST_PIN);
 // Initialize Serial2 for SIM900A communication
 HardwareSerial SIM900A(2); // UART2 on ESP32\
 
+// Initialize Private key
 uint8_t key[32];
 
 int countdown = 45;
 String phoneNumbers[] = {"+639125057697"}; // Array of phone numbers
 
+// Send message to SIM900A
 void sendATCommand(String command) {
   Serial.println("Sending command...");
   SIM900A.println(command);
@@ -44,6 +46,7 @@ void sendATCommand(String command) {
   }
 }
 
+// Send message to LCD
 void notify(String text) {
   lcd.setCursor(0, 2);
   lcd.print("                   ");
@@ -52,6 +55,7 @@ void notify(String text) {
   lcd.print(text)
 }
 
+// Send an error message to LCD
 void throwErr(String text, int customChar) {
   lcd setCursor(0, 3);
   lcd.print("                   ");
@@ -73,7 +77,10 @@ void setup() {
   while (!Serial) {
   };
   Serial.println("SPI and Serial initialized.");
-  notify("SPI & Serial init") initNVS();
+  notify("SPI & Serial init");
+  initNVS(); // Initialize Non Volatile Storage
+
+  // Check key
   if (!loadKeyFromNVS(key)) {
     Serial.println("Key not found.");
     throwErr("KEY NOT FOUND!", 0)
