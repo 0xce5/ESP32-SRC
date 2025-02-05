@@ -8,3 +8,5 @@ src/keys.cpp
 src/key.sh
 src/private_key
 src/public_key
+src/cert.cpp
+src/wifi_utils.cpp

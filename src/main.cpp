@@ -12,15 +12,14 @@
 #include <Wire.h>
 #include <esp_sleep.h>
 
-// Hardcoding IPs is utter stupidity but it works for now
-const char *serverURL = "http://192.168.1.113:3000/api/data";
-const char *server = "mad-fak.local"; // Only the domain or IP
-const uint16_t port = 3000;           // Port number
+// If this does not work, ig ill just shrivel up and die
+const char *serverURL = "http://mad-fak.local/api/data";
+// const char *server = "mad-fak.local"; // Only the domain or IP
+// const uint16_t port = 3000;           // Port number
 
-const char *PRIVATE_KEY = getPrivateKey();
-const char *PUBLIC_KEY = getPublicKey();
-const char *DEVICE_PUBLIC_KEY = getDevicePublicKey();
-/*
+// const char *PRIVATE_KEY = getPrivateKey();
+// const char *PUBLIC_KEY = getPublicKey();
+// const char *DEVICE_PUBLIC_KEY = getDevicePublicKey();
 
 // Set the number of columns and rows for the LCD
 int lcdColumns = 20;
@@ -60,7 +59,7 @@ void sendATCommand(String command) {
 // Send message to LCD
 void notify(String text) {
   lcd.setCursor(0, 2);
-  lcd.print("             ");
+  lcd.print("                    ");
   delay(1500);
   lcd.setCursor(0, 2);
   lcd.print(text);
@@ -69,7 +68,7 @@ void notify(String text) {
 // Send an error message to LCD
 void throwErr(String text, int customChar) {
   lcd.setCursor(0, 3);
-  lcd.print("             ");
+  lcd.print("                    ");
   lcd.setCursor(0, 3);
   lcd.write(customChar);
   lcd.print(text);
@@ -132,9 +131,7 @@ void setup() {
   Serial.println("SLEEP IN ONE SECOND");
 }
 void loop() {}
-
-*/
-
+/*
 void sendPostRequest(const String &encryptedPayload) {
   if (WiFi.status() == WL_CONNECTED) {
     HTTPClient http;
@@ -223,7 +220,7 @@ void setup() {
  }
 
  client.stop();
- */
+
 }
 
 void loop() {
@@ -233,4 +230,4 @@ void loop() {
   sendPostRequest(encryptedPayload);
 
   delay(5000); // Call every 5 seconds for testing
-}
+}*/
