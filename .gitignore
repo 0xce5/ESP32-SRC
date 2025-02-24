@@ -4,9 +4,9 @@
 .ccls
 include/encryptAES.h
 include/keys.h
-src/keys.cpp
+src/keys
 src/key.sh
 src/private_key
 src/public_key
-src/cert.cpp
+src/cert
 src/wifi_utils.cpp

@@ -1,10 +1,10 @@
 #include "wifi_utils.h"
 
 // Predefined SSIDs and passwords
-const char *WifiUtils::ssidList[] = {"5G", "2.4", "SSID3"};
+const char *WifiUtils::ssidList[] = {"5G", "2.4", "AndroidAP_2408"};
 
 const char *WifiUtils::passwordList[] = {"VaughnBlake123!", "VaughnBlake123!",
-                                         "password3"};
+                                         "angelkawaii02"};
 
 // Function to scan for available networks
 void WifiUtils::scanAvailableNetworks() {
@@ -48,7 +48,7 @@ bool WifiUtils::attemptToConnect(const char *ssid, const char *password) {
 
 // Function to scan available networks and try connecting to each
 bool WifiUtils::connectToAvailableNetworks() {
-  scanAvailableNetworks();
+  /*scanAvailableNetworks();*/
 
   int networkCount = WiFi.scanNetworks();
 
