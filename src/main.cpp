@@ -1,8 +1,7 @@
-#include "cert.h"
 #include "wifi_utils.h"
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <ESPmDNS.h>
+/*#include <ESPmDNS.h>*/
 #include <HardwareSerial.h>
 #include <LiquidCrystal_I2C.h>
 #include <MFRC522.h>
@@ -11,44 +10,74 @@
 #include <Wire.h>
 #include <esp_sleep.h>
 
-// If this does not work, ig ill just shrivel up and die
-const char *serverURL = "http://mad-fak.local/api/data";
-const char *host = "mad-fak.local";
-const int httpsPort = 443;
+const char *serverURL = "https://mad-fak.space/api/data";
+const char *host = "mad-fak.space";
+const int httpPort = 443;  // HTTPS port
 
-// const char *PRIVATE_KEY = getPrivateKey();
-// const char *PUBLIC_KEY = getPublicKey();
-// const char *DEVICE_PUBLIC_KEY = getDevicePublicKey();
+const char* ntpServer = "time.google.com";
+const long gmtOffset_sec = 8 * 3600;  // UTC+8 offset
+const int daylightOffset_sec = 0;     // No daylight savings in most UTC+8 regions
 
-// Set the number of columns and rows for the LCD
+const char* root_ca = \
+"-----BEGIN CERTIFICATE-----\n" \
+"MIIDejCCAmKgAwIBAgIQf+UwvzMTQ77dghYQST2KGzANBgkqhkiG9w0BAQsFADBX\n" \
+"MQswCQYDVQQGEwJCRTEZMBcGA1UEChMQR2xvYmFsU2lnbiBudi1zYTEQMA4GA1UE\n" \
+"CxMHUm9vdCBDQTEbMBkGA1UEAxMSR2xvYmFsU2lnbiBSb290IENBMB4XDTIzMTEx\n" \
+"NTAzNDMyMVoXDTI4MDEyODAwMDA0MlowRzELMAkGA1UEBhMCVVMxIjAgBgNVBAoT\n" \
+"GUdvb2dsZSBUcnVzdCBTZXJ2aWNlcyBMTEMxFDASBgNVBAMTC0dUUyBSb290IFI0\n" \
+"MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE83Rzp2iLYK5DuDXFgTB7S0md+8Fhzube\n" \
+"Rr1r1WEYNa5A3XP3iZEwWus87oV8okB2O6nGuEfYKueSkWpz6bFyOZ8pn6KY019e\n" \
+"WIZlD6GEZQbR3IvJx3PIjGov5cSr0R2Ko4H/MIH8MA4GA1UdDwEB/wQEAwIBhjAd\n" \
+"BgNVHSUEFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwDwYDVR0TAQH/BAUwAwEB/zAd\n" \
+"BgNVHQ4EFgQUgEzW63T/STaj1dj8tT7FavCUHYwwHwYDVR0jBBgwFoAUYHtmGkUN\n" \
+"l8qJUC99BM00qP/8/UswNgYIKwYBBQUHAQEEKjAoMCYGCCsGAQUFBzAChhpodHRw\n" \
+"Oi8vaS5wa2kuZ29vZy9nc3IxLmNydDAtBgNVHR8EJjAkMCKgIKAehhxodHRwOi8v\n" \
+"Yy5wa2kuZ29vZy9yL2dzcjEuY3JsMBMGA1UdIAQMMAowCAYGZ4EMAQIBMA0GCSqG\n" \
+"SIb3DQEBCwUAA4IBAQAYQrsPBtYDh5bjP2OBDwmkoWhIDDkic574y04tfzHpn+cJ\n" \
+"odI2D4SseesQ6bDrarZ7C30ddLibZatoKiws3UL9xnELz4ct92vID24FfVbiI1hY\n" \
+"+SW6FoVHkNeWIP0GCbaM4C6uVdF5dTUsMVs/ZbzNnIdCp5Gxmx5ejvEau8otR/Cs\n" \
+"kGN+hr/W5GvT1tMBjgWKZ1i4//emhA1JG1BbPzoLJQvyEotc03lXjTaCzv8mEbep\n" \
+"8RqZ7a2CPsgRbuvTPBwcOMBBmuFeU88+FSBX6+7iP0il8b4Z0QFqIwwMHfs/L6K1\n" \
+"vepuoxtGzi4CZ68zJpiq1UvSqTbFJjtbD4seiMHl\n" \
+"-----END CERTIFICATE-----\n";
+
 int lcdColumns = 20;
 int lcdRows = 4;
 
-// Create an LCD object with the I2C address, columns, and rows
 LiquidCrystal_I2C lcd(0x27, lcdColumns, lcdRows);
 
-//
 WiFiClientSecure client;
 
-// Define the heart shape in an 8x5 pixel grid
+void printLocalTime() {
+    struct tm timeinfo;
+    if (!getLocalTime(&timeinfo)) {
+        Serial.println("Failed to obtain time");
+        return;
+    }
+    Serial.print("ESP32 Time: ");
+    Serial.print(asctime(&timeinfo));  // Print human-readable time
+}
+
 byte heart[8] = {0b00000, 0b01010, 0b11111, 0b11111,
                  0b01110, 0b00100, 0b00000, 0b00000};
 
 byte cautionSign[8] = {B11111, B10001, B10101, B10101,
                        B10101, B10001, B10101, B11111};
-// byte invCaution[8] = {B11111, B11111, B11011, B11011,
+
+bool isAuthenticated = false;
+#define BUTTON_1 34 
+#define BUTTON_2 33 
+#define BUTTON_3 32 
 
 #define SS_PIN 5
 #define RST_PIN 22
 MFRC522 rfid(SS_PIN, RST_PIN);
 
-// Initialize Serial2 for SIM900A communication
-HardwareSerial SIM900A(2); // UART2 on ESP32\
+HardwareSerial SIM900A(2);
 
 int countdown = 45;
-String phoneNumbers[] = {"+639663071486"}; // Array of phone numbers
+String phoneNumbers[] = {"+639663071486"};
 
-// Send message to SIM900A
 void sendATCommand(String command) {
   Serial.println("Sending command...");
   SIM900A.println(command);
@@ -58,7 +87,6 @@ void sendATCommand(String command) {
   }
 }
 
-// Send message to LCD
 void notify(String text) {
   lcd.setCursor(0, 2);
   lcd.print("                    ");
@@ -67,7 +95,6 @@ void notify(String text) {
   lcd.print(text);
 }
 
-// Send an error message to LCD
 void throwErr(String text, int customChar) {
   lcd.setCursor(0, 3);
   lcd.print("                    ");
@@ -78,48 +105,141 @@ void throwErr(String text, int customChar) {
 
 void sendPostRequest() {
   Serial.println("Connecting to server...");
+  client.setCACert(root_ca);
 
-  if (!client.connect(host, httpsPort)) {
+  Serial.print("Free heap before connect: ");
+  Serial.println(ESP.getFreeHeap());
+
+  if (!client.connect(host, httpPort)) {
     Serial.println("Connection failed");
+    Serial.print("Error code: ");
+    Serial.println(client.getWriteError());
     return;
   }
 
   Serial.println("Connected! Sending POST request...");
+  String jsonData = "{\"data\": \"test\"}";
 
-  // JSON payload
-  String jsonData =
-      "{\"data\": "
-      "\"hi13456789ijhgfckgcgy\", \"gamer\": \"gamergamernddwqhu\"}";
-
-  // HTTP request
   client.print("POST /api/data HTTP/1.1\r\n");
+  Serial.println("Sent request line");
   client.print("Host: " + String(host) + "\r\n");
+  Serial.println("Sent Host header");
   client.print("User-Agent: ESP32\r\n");
+  Serial.println("Sent User-Agent");
   client.print("Content-Type: application/json\r\n");
+  Serial.println("Sent Content-Type");
   client.print("Content-Length: " + String(jsonData.length()) + "\r\n");
+  Serial.println("Sent Content-Length");
   client.print("Connection: close\r\n\r\n");
+  Serial.println("Sent Connection header and blank line");
   client.print(jsonData);
+  Serial.println("Request sent. Reading response...");
 
-  // Read response
+  String responseHeaders = "";
+  String line;
   while (client.connected()) {
-    String line = client.readStringUntil('\n');
-    if (line == "\r")
-      break; // End of headers
+    line = client.readStringUntil('\n');
+    responseHeaders += line + "\n";
+    if (line == "\r") {
+      break;
+    }
   }
 
-  Serial.println("Response:");
-  Serial.println(client.readString());
+  int contentLength = 0;
+  size_t headerStart = responseHeaders.indexOf("Content-Length: ");
+  if (headerStart != -1) {
+    size_t headerEnd = responseHeaders.indexOf("\r\n", headerStart);
+    contentLength = responseHeaders.substring(headerStart + 16, headerEnd).toInt();
+  }
+
+  String responseBody = "";
+  while (contentLength > 0 && client.available()) {
+    char c = client.read();
+    responseBody += c;
+    contentLength--;
+  }
+
   client.stop();
+
+  Serial.println("Response headers: ");
+  Serial.println(responseHeaders);
+  Serial.println("Response body: ");
+  Serial.println(responseBody);
 }
 
-// -----------------------------------------------------------------------------------
+void sendMessage(int button, String buildingId, int floor) {
+  String notifyMsg = String(button) + " pressed.";
+
+  if (button == 1) {
+    notifyMsg += " Low";
+  }
+
+  if (button == 2) {
+    notifyMsg += " Medium";
+  }
+
+  if (button == 3) {
+    notifyMsg += " High";
+  }
+
+  Serial.println(notifyMsg);
+  lcd.setCursor(0, 1);
+  lcd.print("         ");
+  notify(notifyMsg);
+  for (int i = 0; i < sizeof(phoneNumbers) / sizeof(phoneNumbers[0]); i++) {
+    String phoneNumber = String(phoneNumbers[i]);
+    String finalMessage = "ALERT! Medical Attention required at: Building " + buildingId + ", Floor" + floor;
+    if (button == 1) {
+      finalMessage += " Low Severity";
+    }
+
+    if (button == 2) {
+      notifyMsg += " Medium Severity";
+    }
+
+    if (button == 3) {
+      notifyMsg += " High Severity";
+    }
+    String notifyMessage = "SMS Sent: " + phoneNumbers[i];
+
+    sendATCommand("AT+CMGS=\"" + phoneNumber + "\"");
+    SIM900A.print(finalMessage);
+    SIM900A.write(26);
+    delay(1000);
+    notify(notifyMessage);
+    sendPostRequest();
+    notify("DATABASE UPDATED");
+  }
+}
+
+int getPressedButton() {
+  int button = -1;  // -1 means no button or multiple buttons pressed
+
+  if (digitalRead(BUTTON_1) == HIGH) {
+      if (button != -1) return -1; // More than one button is pressed
+      button = 1;
+  }
+  if (digitalRead(BUTTON_2) == HIGH) {
+      if (button != -1) return -1;
+      button = 2;
+  }
+  if (digitalRead(BUTTON_3) == HIGH) {
+      if (button != -1) return -1;
+      button = 3;
+  }
+
+  return button;  // 1, 2, or 3 if exactly one is pressed; -1 otherwise
+}
+
 void setup() {
-  // Start Serial Monitor
   Serial.begin(9600);
+  pinMode(BUTTON_1, INPUT);
+  pinMode(BUTTON_2, INPUT);
+  pinMode(BUTTON_3, INPUT);
   SPI.begin();
   rfid.PCD_Init();
-  lcd.init();      // Initialize the LCD
-  lcd.backlight(); // Turn on the backlight
+  lcd.init();
+  lcd.backlight();
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.createChar(0, cautionSign);
@@ -136,11 +256,16 @@ void setup() {
     Serial.println("Failed to connect to any available network.");
     throwErr("CONNECT FAIL!", 0);
   }
-  // Start mDNS
-  if (!MDNS.begin("esp32")) {
-    Serial.println("Error starting mDNS");
-    return;
-  }
+
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  delay(2000);  // Give time to sync
+
+  printLocalTime();  // Show current ESP32 time
+                     //
+  /*if (!MDNS.begin("esp32")) {*/
+  /*  Serial.println("Error starting mDNS");*/
+  /*  return;*/
+  /*}*/
 
   IPAddress resolvedIP;
   if (WiFi.hostByName(host, resolvedIP)) {
@@ -149,146 +274,182 @@ void setup() {
   } else {
     Serial.println("Failed to resolve hostname.");
   }
-
-  // Set cert
-  /*client.setInsecure(); // Bypasses SSL certificate validation*/
-  /*client.setCACert(ssl_cert);*/
-  if (client.connect(host, httpsPort)) {
-    Serial.println("Connected to server with SSL certificate.");
+  
+  Serial.print("Free heap before connect: ");
+  Serial.println(ESP.getFreeHeap());
+  client.setCACert(root_ca);  // Use the provided certificate
+  if (client.connect(host, httpPort)) {  // Updated to use httpPort
+    Serial.println("Connected to server.");
   } else {
     Serial.println("Connection failed.");
   }
 
-  // Configure SIM900A serial communication
-  SIM900A.begin(9600, SERIAL_8N1, 16, 17); // RX=GPIO16, TX=GPIO17
+  SIM900A.begin(9600, SERIAL_8N1, 16, 17);
   Serial.println("Initializing SIM900A...");
-  // Test communication with AT command
-
-  // sendATCommand("AT");
   Serial.println("Check");
   notify("GSM OK");
   lcd.setCursor(0, 0);
   lcd.print("MAD_FAK");
   notify("READY TO SCAN.");
 
-  // Card detection logic
-  while (countdown > 0) {
-    if (rfid.PICC_IsNewCardPresent()) {
-      Serial.println("Card Detected. Proceeding.");
-      lcd.setCursor(0, 1);
-      lcd.print("         ");
-      notify("CARD DETECTED!");
-      for (int i = 0; i < sizeof(phoneNumbers) / sizeof(phoneNumbers[0]); i++) {
-        String phoneNumber = String(phoneNumbers[i]);
-        String message = "ALERT! "; // Example message
-        String notifyMessage = "SMS Sent: " + phoneNumbers[i];
-
-        // Send AT command to initiate SMS to each phone number
-        sendATCommand("AT+CMGS=\"" + phoneNumber + "\"");
-        // Send the SMS content and end with Ctrl+Z (ASCII 26)
-        SIM900A.print(message); // Send the message
-        SIM900A.write(26);      // Send Ctrl+Z to indicate the end of the
-        delay(1000);            // Wait for the SMS to be sent
-        notify(notifyMessage);
-        sendPostRequest();
-        notify("DATABASE UPDATED");
-      }
-
-      if (false) {
-        // something something gamer
-      }
-      countdown--;
-      delay(1000);
-    }
-  }
-  Serial.println("FUNCTION END");
-  delay(4000);
-  Serial.println("SLEEP STARTS IN 5 SECONDS");
-  delay(1000);
-  Serial.println("SLEEP IN ONE SECOND");
+  /*Serial.println("FUNCTION END");*/
+  /*delay(4000);*/
+  /*Serial.println("SLEEP STARTS IN 5 SECONDS");*/
+  /*delay(1000);*/
+  /*Serial.println("SLEEP IN ONE SECOND");*/
 }
-void loop() {}
+
+void loop() {
+  if (rfid.PICC_IsNewCardPresent() && !isAuthenticated) {
+    isAuthenticated = true;
+    notify("Authenticated.");
+  }
+
+  int button = getPressedButton();
+
+  if (isAuthenticated && button == 1 ) {
+    sendMessage(1, "Grade 9", 1);
+    isAuthenticated = false;
+    // do nothing 
+  }
+
+  else if (isAuthenticated && button == 2 ) {
+    sendMessage(2, "Grade 9", 2);
+    isAuthenticated = false;
+    // do nothing 
+  }
+
+  else if (isAuthenticated && button == 3 ) {
+    sendMessage(3, "Grade 9", 3);
+    isAuthenticated = false;
+    // do nothing 
+  }
+  delay(100);
+
+}
 
 
-/*#include <WiFi.h>*/
-/*#include <HTTPClient.h>*/
+/*#include <WiFi.h>         // Changed to WiFi.h instead of WiFiClient.h for full WiFi functionality*/
+/*#include <WiFiClient.h>*/
 /**/
-/*const char* ssid = "2.4";  */
-/*const char* password = "VaughnBlake123!";  */
-/*const char* url = "http://192.168.1.113";  */
+/*// WiFi credentials*/
+/*const char *ssid = "2.4";         // Replace with your WiFi SSID*/
+/*const char *password = "VaughnBlake123!"; // Replace with your WiFi password*/
 /**/
-/*const int dataSize = 100;  // Adjust the size as needed*/
-/*unsigned long responseTimes[dataSize];  */
-/*int responseIndex = 0;  // Index for storing response times*/
-/*int responseCount = 0;   // Counter for successful responses*/
+/*// Global variables*/
+/*const char *host = "192.168.1.156";*/
+/*const int httpPort = 80;*/
+/*WiFiClient client;*/
+/**/
+/*// Array to store 100 latency measurements*/
+/*unsigned long latencyArray[100];*/
+/*int arrayIndex = 0;*/
+/**/
+/*unsigned long benchmarkPost() {*/
+/*    unsigned long startTime = millis();*/
+/**/
+/*    if (!client.connect(host, httpPort)) {*/
+/*        return 0;*/
+/*    }*/
+/**/
+/*    String jsonData = "{\"data\": \"1\"}";*/
+/**/
+/*    client.print("POST /api/data HTTP/1.1\r\n");*/
+/*    client.print("Host: " + String(host) + "\r\n");*/
+/*    client.print("User-Agent: ESP32\r\n");*/
+/*    client.print("Content-Type: application/json\r\n");*/
+/*    client.print("Content-Length: " + String(jsonData.length()) + "\r\n");*/
+/*    client.print("Connection: close\r\n\r\n");*/
+/*    client.print(jsonData);*/
+/**/
+/*    // **Wait for HTTP Response***/
+/*    unsigned long responseStartTime = millis();*/
+/*    while (client.available() == 0) {*/
+/*        if (millis() - responseStartTime > 5000) {  // Timeout 5 seconds*/
+/*            client.stop();*/
+/*            return 0;  // Timeout failure*/
+/*        }*/
+/*        delay(10);*/
+/*    }*/
+/**/
+/*    // **Read Response***/
+/*    String response;*/
+/*    while (client.available()) {*/
+/*        char c = client.read();*/
+/*        response += c;*/
+/*    }*/
+/**/
+/*    unsigned long endTime = millis();*/
+/*    client.stop();*/
+/**/
+/*    Serial.println("Server Response:");*/
+/*    Serial.println(response);*/
+/**/
+/*    return endTime - startTime;*/
+/*}*/
 /**/
 /*void setup() {*/
-/*  Serial.begin(9600);*/
-/*  WiFi.begin(ssid, password);*/
-/*  Serial.print("Connecting to WiFi");*/
+/*    Serial.begin(115200);*/
 /**/
-/*  while (WiFi.status() != WL_CONNECTED) {*/
-/*    delay(500);*/
-/*    Serial.print(".");*/
-/*  }*/
+/*    // Connect to WiFi*/
+/*    Serial.print("Connecting to ");*/
+/*    Serial.println(ssid);*/
+/*    WiFi.begin(ssid, password);*/
 /**/
-/*  Serial.println("\nConnected to WiFi!");*/
+/*    while (WiFi.status() != WL_CONNECTED) {*/
+/*        delay(500);*/
+/*        Serial.print(".");*/
+/*    }*/
+/**/
+/*    Serial.println("");*/
+/*    Serial.println("WiFi connected");*/
+/*    Serial.print("IP address: ");*/
+/*    Serial.println(WiFi.localIP());*/
+/**/
+/*    // Start the benchmark process*/
+/*    Serial.println("Starting latency benchmark...");*/
 /*}*/
 /**/
 /*void loop() {*/
-/*  if (WiFi.status() == WL_CONNECTED && responseCount < dataSize) {*/
-/*    HTTPClient http;*/
-/*    Serial.println("Starting request...");*/
+/*    if (arrayIndex < 100) {*/
+/*        unsigned long latency = benchmarkPost();*/
 /**/
-/*    unsigned long startRequest = millis();  // Start time for the request*/
-/*    http.begin(url);*/
-/*    int httpCode = http.GET();*/
-/*    unsigned long requestTime = millis() - startRequest;  // Time taken for the request*/
+/*        latencyArray[arrayIndex] = latency;*/
 /**/
-/*    if (httpCode > 0) {*/
-/*      Serial.printf("Response code: %d\n", httpCode);*/
+/*        Serial.print("Measurement ");*/
+/*        Serial.print(arrayIndex + 1);*/
+/*        Serial.print(": ");*/
+/*        if (latency == 0) {*/
+/*            Serial.println("Failed");*/
+/*        } else {*/
+/*            Serial.print(latency);*/
+/*            Serial.println(" ms");*/
+/*        }*/
 /**/
-/*      unsigned long startResponse = millis();  // Start time for the response*/
-/*      String payload = http.getString();  // Get response content*/
-/*      unsigned long responseTime = millis() - startResponse;  // Time taken for the response*/
+/*        arrayIndex++;*/
 /**/
-/*      // Calculate total time (request + response)*/
-/*      unsigned long totalTime = requestTime + responseTime;*/
+/*        if (arrayIndex == 100) {*/
+/*            Serial.println("Benchmark complete! 100 measurements collected.");*/
+/*            Serial.println("Latency results:");*/
+/*            for (int i = 0; i < 100; i++) {*/
+/*                Serial.print("  ");*/
+/*                Serial.print(i + 1);*/
+/*                Serial.print(": ");*/
+/*                Serial.print(latencyArray[i]);*/
+/*                Serial.println(" ms");*/
+/*            }*/
 /**/
-/*      Serial.printf("Request Time: %lu ms\n", requestTime);*/
-/*      Serial.printf("Response Time: %lu ms\n", responseTime);*/
-/*      Serial.printf("Total Time (Request + Response): %lu ms\n", totalTime);*/
-/**/
-/*      // Store the total time in the array*/
-/*      responseTimes[responseIndex] = totalTime;*/
-/*      responseIndex = (responseIndex + 1) % dataSize;  // Loop back if array is full*/
-/**/
-/*      // Increment response count*/
-/*      responseCount++;*/
-/*      Serial.printf("Successful responses: %d\n", responseCount);*/
-/**/
-/*    } else {*/
-/*      Serial.printf("Request failed, error: %s\n", http.errorToString(httpCode).c_str());*/
+/*            Serial.print("\nlatency_data = [");*/
+/*            for (int i = 0; i < 100; i++) {*/
+/*                  Serial.print(latencyArray[i]);*/
+/*                  if (i < 99) Serial.print(", ");  // Add comma except for the last element*/
+/*            }*/
+/*            Serial.println("]");  // Close Python array format*/
+/*            while (true) {*/
+/*                delay(1000); // Idle forever*/
+/*            }*/
+/*        }*/
 /*    }*/
 /**/
-/*    http.end();*/
-/*  } else if (responseCount >= dataSize) {*/
-/*    // When dataSize is reached, print the array as a single line*/
-/*    Serial.print("\nResponse Times Array: [");*/
-/*    for (int i = 0; i < dataSize; i++) {*/
-/*      Serial.print(responseTimes[i]);*/
-/*      if (i < dataSize - 1) {*/
-/*        Serial.print(", ");  // Separate values with commas*/
-/*      }*/
-/*    }*/
-/*    Serial.println("]");*/
-/**/
-/*    // Stop further execution or reset*/
-/*    while (1);  // Halts the loop once the data is printed*/
-/*  } else {*/
-/*    Serial.println("WiFi not connected!");*/
-/*  }*/
-/**/
-/*  delay(100);  // Wait before the next request*/
+/*    delay(1000); // Delay between measurements*/
 /*}*/
-
