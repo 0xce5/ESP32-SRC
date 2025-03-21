@@ -1,7 +1,6 @@
 #include "wifi_utils.h"
 #include <Arduino.h>
 #include <ArduinoJson.h>
-/*#include <ESPmDNS.h>*/
 #include <HardwareSerial.h>
 #include <LiquidCrystal_I2C.h>
 #include <MFRC522.h>
@@ -261,11 +260,6 @@ void setup() {
   delay(2000);  // Give time to sync
 
   printLocalTime();  // Show current ESP32 time
-                     //
-  /*if (!MDNS.begin("esp32")) {*/
-  /*  Serial.println("Error starting mDNS");*/
-  /*  return;*/
-  /*}*/
 
   IPAddress resolvedIP;
   if (WiFi.hostByName(host, resolvedIP)) {
@@ -274,7 +268,7 @@ void setup() {
   } else {
     Serial.println("Failed to resolve hostname.");
   }
-  
+
   Serial.print("Free heap before connect: ");
   Serial.println(ESP.getFreeHeap());
   client.setCACert(root_ca);  // Use the provided certificate
@@ -291,14 +285,7 @@ void setup() {
   lcd.setCursor(0, 0);
   lcd.print("MAD_FAK");
   notify("READY TO SCAN.");
-
-  /*Serial.println("FUNCTION END");*/
-  /*delay(4000);*/
-  /*Serial.println("SLEEP STARTS IN 5 SECONDS");*/
-  /*delay(1000);*/
-  /*Serial.println("SLEEP IN ONE SECOND");*/
 }
-
 void loop() {
   if (rfid.PICC_IsNewCardPresent() && !isAuthenticated) {
     isAuthenticated = true;
@@ -326,130 +313,91 @@ void loop() {
   }
   delay(100);
 
-}
-
-
-/*#include <WiFi.h>         // Changed to WiFi.h instead of WiFiClient.h for full WiFi functionality*/
-/*#include <WiFiClient.h>*/
+/*#include <WiFi.h>*/
+/*#include <HTTPClient.h>*/
 /**/
-/*// WiFi credentials*/
-/*const char *ssid = "2.4";         // Replace with your WiFi SSID*/
-/*const char *password = "VaughnBlake123!"; // Replace with your WiFi password*/
+/*const char* ssid = "SimNet";  // Replace with your WiFi SSID*/
+/*const char* password = "test1234";  // Replace with your WiFi password*/
 /**/
-/*// Global variables*/
-/*const char *host = "192.168.1.156";*/
-/*const int httpPort = 80;*/
-/*WiFiClient client;*/
+/*const char* serverURL = "https://mad-fak.space/api/data";*/
 /**/
-/*// Array to store 100 latency measurements*/
-/*unsigned long latencyArray[100];*/
-/*int arrayIndex = 0;*/
+/*#define NUM_REQUESTS 50  // Run 50 trials*/
 /**/
-/*unsigned long benchmarkPost() {*/
-/*    unsigned long startTime = millis();*/
+/*// Python-style array output*/
+/*String latency = "latency = [";*/
+/*String bandwidth = "bandwidth = [";*/
+/*String packet_loss = "packet_loss = [";*/
+/*String rssi_values = "rssi = [";*/
 /**/
-/*    if (!client.connect(host, httpPort)) {*/
-/*        return 0;*/
-/*    }*/
-/**/
-/*    String jsonData = "{\"data\": \"1\"}";*/
-/**/
-/*    client.print("POST /api/data HTTP/1.1\r\n");*/
-/*    client.print("Host: " + String(host) + "\r\n");*/
-/*    client.print("User-Agent: ESP32\r\n");*/
-/*    client.print("Content-Type: application/json\r\n");*/
-/*    client.print("Content-Length: " + String(jsonData.length()) + "\r\n");*/
-/*    client.print("Connection: close\r\n\r\n");*/
-/*    client.print(jsonData);*/
-/**/
-/*    // **Wait for HTTP Response***/
-/*    unsigned long responseStartTime = millis();*/
-/*    while (client.available() == 0) {*/
-/*        if (millis() - responseStartTime > 5000) {  // Timeout 5 seconds*/
-/*            client.stop();*/
-/*            return 0;  // Timeout failure*/
-/*        }*/
-/*        delay(10);*/
-/*    }*/
-/**/
-/*    // **Read Response***/
-/*    String response;*/
-/*    while (client.available()) {*/
-/*        char c = client.read();*/
-/*        response += c;*/
-/*    }*/
-/**/
-/*    unsigned long endTime = millis();*/
-/*    client.stop();*/
-/**/
-/*    Serial.println("Server Response:");*/
-/*    Serial.println(response);*/
-/**/
-/*    return endTime - startTime;*/
-/*}*/
+/*void measureLatencyBandwidthPacketLoss();*/
 /**/
 /*void setup() {*/
-/*    Serial.begin(115200);*/
+/*    Serial.begin(9600);*/
+/*    delay(1000);*/
 /**/
 /*    // Connect to WiFi*/
-/*    Serial.print("Connecting to ");*/
-/*    Serial.println(ssid);*/
 /*    WiFi.begin(ssid, password);*/
-/**/
+/*    Serial.print("Connecting to WiFi...");*/
 /*    while (WiFi.status() != WL_CONNECTED) {*/
-/*        delay(500);*/
-/*        Serial.print(".");*/
+/*       delay(500);*/
+/*       Serial.print(".");*/
+/*    }*/
+/*    Serial.println("\nConnected!");*/
+/*    Serial.println(WiFi.RSSI());*/
+/**/
+/*    // Perform measurements*/
+/*    measureLatencyBandwidthPacketLoss();*/
+/**/
+/*    // Print Python-style arrays*/
+/*    Serial.println(latency + "]");*/
+/*    Serial.println(bandwidth + "]");*/
+/*    Serial.println(packet_loss + "]");*/
+/*    Serial.println(rssi_values + "]");*/
+/*}*/
+/**/
+/*void measureLatencyBandwidthPacketLoss() {*/
+/*    int failedRequests = 0;*/
+/**/
+/*    for (int i = 0; i < NUM_REQUESTS; i++) {*/
+/*        if (WiFi.status() != WL_CONNECTED) {*/
+/*            Serial.println("WiFi Disconnected!");*/
+/*            return;*/
+/*        }*/
+/**/
+/*        HTTPClient http;*/
+/*        http.begin(serverURL);*/
+/*        http.addHeader("Content-Type", "application/json");*/
+/**/
+/*        String payload = "{\"data\": \"test-packet-" + String(i) + "\"}";*/
+/**/
+/*        unsigned long startTime = millis();  // Start time*/
+/*        int httpResponseCode = http.POST(payload);*/
+/*        unsigned long endTime = millis();  // End time*/
+/**/
+/*        int rssi = WiFi.RSSI();  // Get current RSSI*/
+/**/
+/*        if (httpResponseCode > 0) {*/
+/*            unsigned long responseTime = endTime - startTime;*/
+/*            int dataSize = payload.length() + 100;  // Approximate size with headers (bytes)*/
+/*            float speed = (dataSize * 8.0) / (responseTime / 1000.0);  // Bits per second*/
+/**/
+/*            // Store results*/
+/*            latency += String(responseTime) + (i < NUM_REQUESTS - 1 ? ", " : "");*/
+/*            bandwidth += String(speed / 1000.0) + (i < NUM_REQUESTS - 1 ? ", " : "");  // Convert to Kbps*/
+/*        } else {*/
+/*            failedRequests++;*/
+/*        }*/
+/**/
+/*        rssi_values += String(rssi) + (i < NUM_REQUESTS - 1 ? ", " : "");*/
+/**/
+/*        http.end();*/
+/*        delay(500);  // Short delay between requests*/
 /*    }*/
 /**/
-/*    Serial.println("");*/
-/*    Serial.println("WiFi connected");*/
-/*    Serial.print("IP address: ");*/
-/*    Serial.println(WiFi.localIP());*/
-/**/
-/*    // Start the benchmark process*/
-/*    Serial.println("Starting latency benchmark...");*/
+/*    float packetLossPercent = ((float)failedRequests / NUM_REQUESTS) * 100.0;*/
+/*    packet_loss += String(packetLossPercent);*/
 /*}*/
 /**/
 /*void loop() {*/
-/*    if (arrayIndex < 100) {*/
-/*        unsigned long latency = benchmarkPost();*/
-/**/
-/*        latencyArray[arrayIndex] = latency;*/
-/**/
-/*        Serial.print("Measurement ");*/
-/*        Serial.print(arrayIndex + 1);*/
-/*        Serial.print(": ");*/
-/*        if (latency == 0) {*/
-/*            Serial.println("Failed");*/
-/*        } else {*/
-/*            Serial.print(latency);*/
-/*            Serial.println(" ms");*/
-/*        }*/
-/**/
-/*        arrayIndex++;*/
-/**/
-/*        if (arrayIndex == 100) {*/
-/*            Serial.println("Benchmark complete! 100 measurements collected.");*/
-/*            Serial.println("Latency results:");*/
-/*            for (int i = 0; i < 100; i++) {*/
-/*                Serial.print("  ");*/
-/*                Serial.print(i + 1);*/
-/*                Serial.print(": ");*/
-/*                Serial.print(latencyArray[i]);*/
-/*                Serial.println(" ms");*/
-/*            }*/
-/**/
-/*            Serial.print("\nlatency_data = [");*/
-/*            for (int i = 0; i < 100; i++) {*/
-/*                  Serial.print(latencyArray[i]);*/
-/*                  if (i < 99) Serial.print(", ");  // Add comma except for the last element*/
-/*            }*/
-/*            Serial.println("]");  // Close Python array format*/
-/*            while (true) {*/
-/*                delay(1000); // Idle forever*/
-/*            }*/
-/*        }*/
-/*    }*/
-/**/
-/*    delay(1000); // Delay between measurements*/
+/*    // Nothing here*/
 /*}*/
